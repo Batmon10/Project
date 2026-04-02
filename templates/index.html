@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Multi-AI Collaboration Hub</title>
+  <style>
+    /* ── Reset & Base ──────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0f1117;
+      --bg2: #1a1d27;
+      --bg3: #22263a;
+      --border: #2e3348;
+      --text: #e8eaf0;
+      --text2: #8b90a8;
+      --accent: #7c6ff7;
+      --claude: #d4a853;
+      --chatgpt: #10a37f;
+      --perplexity: #20b2e8;
+      --coordinator: #f07080;
+      --radius: 12px;
+    }
+    html { font-size: 15px; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ────────────────────────────────────────────────────────── */
+    header {
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--bg2);
+    }
+    header .logo { font-size: 1.4rem; }
+    header h1 { font-size: 1.15rem; font-weight: 600; }
+    header .subtitle { font-size: 0.8rem; color: var(--text2); margin-top: 2px; }
+    .status-dots { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+    .dot {
+      width: 8px; height: 8px; border-radius: 50%; background: #444;
+      transition: background 0.3s;
+    }
+    .dot.online { background: #2ecc71; }
+    .dot.offline { background: #e74c3c; }
+    .dot-label { font-size: 0.72rem; color: var(--text2); }
+
+    /* ── Layout ────────────────────────────────────────────────────────── */
+    .app { flex: 1; display: flex; flex-direction: column; max-width: 1200px; margin: 0 auto; width: 100%; padding: 20px; gap: 16px; }
+
+    /* ── Controls Bar ──────────────────────────────────────────────────── */
+    .controls {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      align-items: center;
+    }
+    .control-group { display: flex; flex-direction: column; gap: 6px; }
+    .control-group label { font-size: 0.72rem; color: var(--text2); text-transform: uppercase; letter-spacing: 0.06em; }
+    .ai-toggles { display: flex; gap: 8px; }
+    .ai-toggle {
+      padding: 6px 14px;
+      border-radius: 20px;
+      border: 2px solid var(--border);
+      background: transparent;
+      color: var(--text2);
+      cursor: pointer;
+      font-size: 0.82rem;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+    .ai-toggle.active-claude   { border-color: var(--claude);      color: var(--claude);      background: rgba(212,168,83,0.12); }
+    .ai-toggle.active-chatgpt  { border-color: var(--chatgpt);     color: var(--chatgpt);     background: rgba(16,163,127,0.12); }
+    .ai-toggle.active-perplexity { border-color: var(--perplexity); color: var(--perplexity); background: rgba(32,178,232,0.12); }
+    .mode-btns { display: flex; gap: 6px; }
+    .mode-btn {
+      padding: 6px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text2);
+      cursor: pointer;
+      font-size: 0.82rem;
+      transition: all 0.2s;
+    }
+    .mode-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .rounds-input {
+      display: flex; align-items: center; gap: 8px;
+    }
+    .rounds-input input[type=range] { width: 80px; accent-color: var(--accent); }
+    .rounds-input span { font-size: 0.85rem; min-width: 20px; text-align: center; }
+
+    /* ── Chat Area ─────────────────────────────────────────────────────── */
+    #chat {
+      flex: 1;
+      min-height: 400px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .empty-state {
+      flex: 1; display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 10px; color: var(--text2);
+    }
+    .empty-state .big { font-size: 2.5rem; }
+    .empty-state p { font-size: 0.9rem; }
+
+    /* Message bubbles */
+    .msg-group { display: flex; flex-direction: column; gap: 4px; }
+    .msg-header {
+      display: flex; align-items: center; gap: 8px; margin-bottom: 4px;
+    }
+    .ai-badge {
+      font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 10px;
+      text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .badge-claude      { background: rgba(212,168,83,0.2);  color: var(--claude); }
+    .badge-chatgpt     { background: rgba(16,163,127,0.2);  color: var(--chatgpt); }
+    .badge-perplexity  { background: rgba(32,178,232,0.2);  color: var(--perplexity); }
+    .badge-user        { background: rgba(124,111,247,0.2); color: var(--accent); }
+    .phase-label {
+      font-size: 0.68rem; color: var(--text2); font-style: italic;
+    }
+
+    .bubble {
+      border-radius: 12px; padding: 14px 16px;
+      line-height: 1.65; font-size: 0.92rem;
+      border: 1px solid var(--border);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .bubble-user     { background: rgba(124,111,247,0.1); border-color: rgba(124,111,247,0.3); }
+    .bubble-claude      { background: rgba(212,168,83,0.07);  border-color: rgba(212,168,83,0.25); }
+    .bubble-chatgpt     { background: rgba(16,163,127,0.07);  border-color: rgba(16,163,127,0.25); }
+    .bubble-perplexity  { background: rgba(32,178,232,0.07);  border-color: rgba(32,178,232,0.25); }
+
+    .bubble .cursor {
+      display: inline-block; width: 2px; height: 1em;
+      background: var(--text2); margin-left: 2px;
+      animation: blink 0.9s step-end infinite;
+      vertical-align: text-bottom;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* Status / round banners */
+    .status-banner {
+      text-align: center; font-size: 0.78rem; color: var(--text2);
+      padding: 6px; border-radius: 6px; background: var(--bg3);
+    }
+    .round-banner {
+      text-align: center; font-size: 0.8rem; font-weight: 600;
+      color: var(--accent); padding: 4px;
+    }
+    .complete-banner {
+      text-align: center; font-size: 0.85rem; color: #2ecc71;
+      padding: 8px; border-radius: 8px; background: rgba(46,204,113,0.08);
+      border: 1px solid rgba(46,204,113,0.2);
+    }
+
+    /* Parallel columns */
+    .parallel-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 12px;
+    }
+    .parallel-col {
+      display: flex; flex-direction: column; gap: 6px;
+    }
+
+    /* ── Input bar ─────────────────────────────────────────────────────── */
+    .input-bar {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+    #prompt {
+      flex: 1; background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); padding: 10px 14px;
+      font-size: 0.95rem; resize: none; height: 46px; max-height: 160px;
+      font-family: inherit; line-height: 1.5;
+      transition: border-color 0.2s;
+    }
+    #prompt:focus { outline: none; border-color: var(--accent); }
+    #sendBtn {
+      padding: 10px 22px; background: var(--accent); border: none;
+      border-radius: 8px; color: #fff; font-size: 0.9rem; font-weight: 600;
+      cursor: pointer; transition: opacity 0.2s; white-space: nowrap; height: 46px;
+    }
+    #sendBtn:disabled { opacity: 0.45; cursor: not-allowed; }
+    #sendBtn:hover:not(:disabled) { opacity: 0.85; }
+
+    /* Scrollbar */
+    #chat::-webkit-scrollbar { width: 6px; }
+    #chat::-webkit-scrollbar-track { background: transparent; }
+    #chat::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🤖</div>
+  <div>
+    <h1>Multi-AI Collaboration Hub</h1>
+    <div class="subtitle">Connect Claude, ChatGPT & Perplexity — let them talk to each other</div>
+  </div>
+  <div class="status-dots" id="statusDots">
+    <div class="dot" id="dot-claude"></div><div class="dot-label">Claude</div>
+    <div class="dot" id="dot-chatgpt"></div><div class="dot-label">ChatGPT</div>
+    <div class="dot" id="dot-perplexity"></div><div class="dot-label">Perplexity</div>
+  </div>
+</header>
+
+<div class="app">
+
+  <!-- Controls -->
+  <div class="controls">
+    <div class="control-group">
+      <label>AIs</label>
+      <div class="ai-toggles">
+        <button class="ai-toggle active-claude"      data-ai="claude"      onclick="toggleAI('claude')">Claude</button>
+        <button class="ai-toggle active-chatgpt"     data-ai="chatgpt"     onclick="toggleAI('chatgpt')">ChatGPT</button>
+        <button class="ai-toggle active-perplexity"  data-ai="perplexity"  onclick="toggleAI('perplexity')">Perplexity</button>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label>Mode</label>
+      <div class="mode-btns">
+        <button class="mode-btn active" data-mode="parallel"   onclick="setMode('parallel')">⚡ Parallel</button>
+        <button class="mode-btn"        data-mode="discussion" onclick="setMode('discussion')">💬 Discussion</button>
+        <button class="mode-btn"        data-mode="group"      onclick="setMode('group')">🏗 Group Work</button>
+      </div>
+    </div>
+
+    <div class="control-group" id="roundsGroup" style="display:none">
+      <label>Discussion Rounds</label>
+      <div class="rounds-input">
+        <input type="range" id="roundsSlider" min="1" max="3" value="1"
+               oninput="document.getElementById('roundsVal').textContent=this.value" />
+        <span id="roundsVal">1</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chat -->
+  <div id="chat">
+    <div class="empty-state" id="emptyState">
+      <div class="big">🧠</div>
+      <p>Ask anything — your AI team will collaborate to answer.</p>
+      <p style="font-size:0.8rem">Choose a mode above, then type your question.</p>
+    </div>
+  </div>
+
+  <!-- Mode legend -->
+  <div id="modeLegend" style="font-size:0.78rem;color:var(--text2);padding:0 4px;">
+    <b>⚡ Parallel</b>: All AIs answer your question at the same time.
+  </div>
+
+  <!-- Input -->
+  <div class="input-bar">
+    <textarea id="prompt" placeholder="Ask your AI team anything…" rows="1"
+              onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+    <button id="sendBtn" onclick="send()">Send →</button>
+  </div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+const enabled = { claude: true, chatgpt: true, perplexity: true };
+let mode = "parallel";
+let isStreaming = false;
+
+// ── Mode legends ───────────────────────────────────────────────────────────
+const legends = {
+  parallel:   "⚡ <b>Parallel</b>: All AIs answer your question at the same time.",
+  discussion: "💬 <b>Discussion</b>: AIs take turns, each reading and responding to what the others said.",
+  group:      "🏗 <b>Group Work</b>: Claude coordinates, breaks the task into sub-tasks, workers execute, then Claude synthesizes.",
+};
+
+// ── UI helpers ─────────────────────────────────────────────────────────────
+function toggleAI(ai) {
+  enabled[ai] = !enabled[ai];
+  const btn = document.querySelector(`[data-ai="${ai}"]`);
+  btn.classList.toggle(`active-${ai}`, enabled[ai]);
+}
+
+function setMode(m) {
+  mode = m;
+  document.querySelectorAll(".mode-btn").forEach(b => b.classList.toggle("active", b.dataset.mode === m));
+  document.getElementById("roundsGroup").style.display = (m === "discussion") ? "flex" : "none";
+  document.getElementById("modeLegend").innerHTML = legends[m];
+}
+
+function autoResize(el) {
+  el.style.height = "46px";
+  el.style.height = Math.min(el.scrollHeight, 160) + "px";
+}
+
+function handleKey(e) {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+}
+
+function scrollChat() {
+  const chat = document.getElementById("chat");
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function clearEmpty() {
+  const e = document.getElementById("emptyState");
+  if (e) e.remove();
+}
+
+function addBanner(cls, text) {
+  clearEmpty();
+  const d = document.createElement("div");
+  d.className = cls;
+  d.textContent = text;
+  document.getElementById("chat").appendChild(d);
+  scrollChat();
+  return d;
+}
+
+// Create a bubble for an AI response
+function createBubble(ai, phaseLabel) {
+  clearEmpty();
+  const chat = document.getElementById("chat");
+
+  const group = document.createElement("div");
+  group.className = "msg-group";
+
+  const header = document.createElement("div");
+  header.className = "msg-header";
+
+  const badge = document.createElement("span");
+  badge.className = `ai-badge badge-${ai}`;
+  badge.textContent = { claude: "Claude", chatgpt: "ChatGPT", perplexity: "Perplexity" }[ai] || ai;
+  header.appendChild(badge);
+
+  if (phaseLabel) {
+    const pl = document.createElement("span");
+    pl.className = "phase-label";
+    pl.textContent = phaseLabel;
+    header.appendChild(pl);
+  }
+
+  const bubble = document.createElement("div");
+  bubble.className = `bubble bubble-${ai}`;
+
+  const cursor = document.createElement("span");
+  cursor.className = "cursor";
+  bubble.appendChild(cursor);
+
+  group.appendChild(header);
+  group.appendChild(bubble);
+  chat.appendChild(group);
+  scrollChat();
+
+  return { bubble, cursor };
+}
+
+function addUserMessage(text) {
+  clearEmpty();
+  const chat = document.getElementById("chat");
+  const group = document.createElement("div");
+  group.className = "msg-group";
+  const header = document.createElement("div");
+  header.className = "msg-header";
+  const badge = document.createElement("span");
+  badge.className = "ai-badge badge-user";
+  badge.textContent = "You";
+  header.appendChild(badge);
+  const bubble = document.createElement("div");
+  bubble.className = "bubble bubble-user";
+  bubble.textContent = text;
+  group.appendChild(header);
+  group.appendChild(bubble);
+  chat.appendChild(group);
+  scrollChat();
+}
+
+// ── Parallel mode rendering ────────────────────────────────────────────────
+function createParallelGrid(ais) {
+  clearEmpty();
+  const chat = document.getElementById("chat");
+  const grid = document.createElement("div");
+  grid.className = "parallel-grid";
+  grid.id = "parallelGrid";
+
+  const map = {};
+  for (const ai of ais) {
+    const col = document.createElement("div");
+    col.className = "parallel-col";
+
+    const header = document.createElement("div");
+    header.className = "msg-header";
+    const badge = document.createElement("span");
+    badge.className = `ai-badge badge-${ai}`;
+    badge.textContent = { claude: "Claude", chatgpt: "ChatGPT", perplexity: "Perplexity" }[ai];
+    header.appendChild(badge);
+
+    const bubble = document.createElement("div");
+    bubble.className = `bubble bubble-${ai}`;
+    const cursor = document.createElement("span");
+    cursor.className = "cursor";
+    bubble.appendChild(cursor);
+
+    col.appendChild(header);
+    col.appendChild(bubble);
+    grid.appendChild(col);
+    map[ai] = { bubble, cursor };
+  }
+  chat.appendChild(grid);
+  scrollChat();
+  return map;
+}
+
+// ── Status check ───────────────────────────────────────────────────────────
+async function checkStatus() {
+  try {
+    const r = await fetch("/api/status");
+    const data = await r.json();
+    for (const [ai, online] of Object.entries(data)) {
+      const dot = document.getElementById(`dot-${ai}`);
+      if (dot) dot.className = `dot ${online ? "online" : "offline"}`;
+    }
+  } catch {}
+}
+checkStatus();
+
+// ── Send ───────────────────────────────────────────────────────────────────
+async function send() {
+  if (isStreaming) return;
+  const prompt = document.getElementById("prompt").value.trim();
+  if (!prompt) return;
+
+  const activeAIs = Object.keys(enabled).filter(k => enabled[k]);
+  if (activeAIs.length === 0) {
+    alert("Please enable at least one AI."); return;
+  }
+
+  isStreaming = true;
+  document.getElementById("sendBtn").disabled = true;
+  document.getElementById("prompt").value = "";
+  document.getElementById("prompt").style.height = "46px";
+
+  addUserMessage(prompt);
+
+  const rounds = parseInt(document.getElementById("roundsSlider").value) || 1;
+
+  const resp = await fetch("/api/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt, mode, enabled, rounds }),
+  });
+
+  if (!resp.ok) {
+    addBanner("status-banner", "Error: " + resp.statusText);
+    isStreaming = false;
+    document.getElementById("sendBtn").disabled = false;
+    return;
+  }
+
+  // Track bubbles per-AI (keyed by ai+phase for group mode)
+  const bubbles = {};  // key -> { bubble, cursor }
+  let parallelMap = null;
+
+  if (mode === "parallel") {
+    parallelMap = createParallelGrid(activeAIs);
+  }
+
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    const parts = buffer.split("\n\n");
+    buffer = parts.pop() || "";
+
+    for (const part of parts) {
+      if (!part.trim()) continue;
+      const lines = part.split("\n");
+      let eventType = "message", dataStr = "";
+      for (const line of lines) {
+        if (line.startsWith("event: ")) eventType = line.slice(7).trim();
+        if (line.startsWith("data: ")) dataStr = line.slice(6).trim();
+      }
+      if (!dataStr) continue;
+      let data;
+      try { data = JSON.parse(dataStr); } catch { continue; }
+
+      if (eventType === "status") {
+        addBanner("status-banner", data.msg);
+
+      } else if (eventType === "round") {
+        addBanner("round-banner", `── Round ${data.round} ──`);
+
+      } else if (eventType === "token") {
+        const ai = data.ai;
+        const phase = data.phase || "";
+        const key = ai + phase;
+
+        if (mode === "parallel" && parallelMap && parallelMap[ai]) {
+          const { bubble, cursor } = parallelMap[ai];
+          const txt = document.createTextNode(data.text);
+          bubble.insertBefore(txt, cursor);
+          scrollChat();
+        } else {
+          if (!bubbles[key]) {
+            const phaseLabel = phase === "breakdown" ? "(breaking down task)"
+                             : phase === "synthesis"  ? "(synthesizing results)"
+                             : phase === "work"        ? "(working on sub-task)"
+                             : "";
+            bubbles[key] = createBubble(ai, phaseLabel);
+          }
+          const { bubble, cursor } = bubbles[key];
+          const txt = document.createTextNode(data.text);
+          bubble.insertBefore(txt, cursor);
+          scrollChat();
+        }
+
+      } else if (eventType === "done_ai") {
+        const ai = data.ai;
+        const phase = data.phase || "";
+        const key = ai + phase;
+
+        if (mode === "parallel" && parallelMap && parallelMap[ai]) {
+          parallelMap[ai].cursor.remove();
+        } else if (bubbles[key]) {
+          bubbles[key].cursor.remove();
+        }
+
+      } else if (eventType === "complete") {
+        addBanner("complete-banner", "✓ " + data.msg);
+
+      } else if (eventType === "error") {
+        addBanner("status-banner", "⚠ " + data.msg);
+      }
+    }
+  }
+
+  isStreaming = false;
+  document.getElementById("sendBtn").disabled = false;
+  document.getElementById("prompt").focus();
+}
+</script>
+</body>
+</html>
